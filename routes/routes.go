@@ -11,13 +11,15 @@ import (
 
 func SemaphoreAnalytics(w http.ResponseWriter, req *http.Request) {
 	go func() {
+		log.Printf("semaphore analytics route start")
 		types.C <- 1
 		Analytics(w, req)
-		<-types.C
 	}()
+	<-types.C
 }
 
 func Analytics(w http.ResponseWriter, req *http.Request) {
+	log.Printf("analytics route start")
 	go func() {
 		user_id := req.Header.Get("X-Tantum-Authorization")
 		data := types.Data{
@@ -41,4 +43,5 @@ func Analytics(w http.ResponseWriter, req *http.Request) {
 		log.Printf("Failed to write a response to the user: %s\n", err)
 		return
 	}
+	return
 }

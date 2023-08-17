@@ -12,8 +12,11 @@ services:
       POSTGRES_USER: pguser
       POSTGRES_DB: pgdb
       POSTGRES_HOST: postgres
+      MAX_CONNECTIONS: 50
+      SERVER_HOST:
+      SERVER_PORT: 8000
     ports:
-      - ':8000'
+      - '8000:8000'
     depends_on:
       - postgres
   postgres:
@@ -32,7 +35,7 @@ services:
       - ./pg_data:/var/lib/postgresql/data
       - ./sql_scripts:/docker-entrypoint-initdb.d
     ports:
-      - ':5432'
+      - '5432:5432'
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U pguser -d pgdb" ]
       interval: 5s
