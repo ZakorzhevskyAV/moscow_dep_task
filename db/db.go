@@ -2,14 +2,14 @@ package db
 
 import (
 	"database/sql"
-	"log"
+	"moscow_dep_task/types"
 	"time"
 )
 
 func CreateRow(conn *sql.DB, user_id string, data []byte, timestamp time.Time) error {
-	_, err := conn.Query("INSERT INTO UserData VALUES ($1, $2, $3);", user_id, data, timestamp)
+	_, err := conn.Exec("INSERT INTO UserData VALUES ($1, $2, $3);", user_id, data, timestamp)
 	if err != nil {
-		log.Printf("Failed to insert a data row: %s\n", err)
+		types.Log.Errorf("Failed to insert a data row: %s", err)
 		return err
 	}
 	return err

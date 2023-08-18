@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"log"
 	"moscow_dep_task/routes"
 	"moscow_dep_task/types"
@@ -17,27 +18,42 @@ import (
 func init() {
 	var err error
 
-	//flag.Parse()
-	//path := flag.String("config", "config.yaml", "Path to config file.")
-	//err := config.ParseConfig(*path, types.Cfg)
-	//
-	//if err != nil {
-	//	log.Printf("No config at the selected path or failed to parse config into struct; using default settings")
-	//}
-	//
-	//types.Cfg = &types.Config{
-	//	Server: types.Server{
-	//		Host:           "",
-	//		Port:           "8080",
-	//		MaxConnections: 50,
-	//	},
-	//	Database: types.Database{
-	//		User:     "pguser",
-	//		Password: "pgpass",
-	//		DB:       "pgdb",
-	//		Host:     "postgres",
-	//	},
-	//}
+	types.Log = &logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
+	}
+
+	LogFormatter := os.Getenv("LOG_FORMATTER")
+	switch LogFormatter {
+	case "json":
+		types.Log.Formatter = new(logrus.JSONFormatter)
+	case "text":
+		types.Log.Formatter = new(logrus.TextFormatter)
+	default:
+		types.Log.Formatter = new(logrus.TextFormatter)
+	}
+
+	LogLevel := os.Getenv("LOG_LEVEL")
+	switch LogLevel {
+	case "fatal":
+		types.Log.Level = logrus.FatalLevel
+	case "error":
+		types.Log.Level = logrus.ErrorLevel
+	case "warn":
+		types.Log.Level = logrus.WarnLevel
+	case "debug":
+		types.Log.Level = logrus.DebugLevel
+	case "info":
+		types.Log.Level = logrus.InfoLevel
+	case "panic":
+		types.Log.Level = logrus.PanicLevel
+	case "trace":
+		types.Log.Level = logrus.TraceLevel
+	default:
+		types.Log.Level = logrus.InfoLevel
+	}
 
 	connString := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable",
 		os.Getenv("POSTGRES_USER"),
@@ -47,28 +63,34 @@ func init() {
 
 	types.Conn, err = sql.Open("postgres", connString)
 	if err != nil {
-		log.Panicf("Failed to connect to DB, panicking")
+		types.Log.Fatalf("Failed to connect to DB, panicking")
 	}
 
 	err = types.Conn.Ping()
 	if err != nil {
-		log.Panicf("Failed to check the connection to DB via ping, panicking")
+		types.Log.Fatalf("Failed to check the connection to DB via ping, panicking")
 	}
 }
 
 func main() {
 	maxconn, err := strconv.Atoi(os.Getenv("MAX_CONNECTIONS"))
 	if err != nil || maxconn == 0 {
-		log.Printf("registering the analytics route")
+		types.Log.Debugf("Registering the analytics route")
 		http.HandleFunc("/analytics", routes.Analytics)
 	} else {
 		types.C = make(chan int, maxconn)
+		types.Log.Debugf("Registering the semaphore analytics route")
 		http.HandleFunc("/analytics", routes.SemaphoreAnalytics)
 	}
-	time.NewTicker(1 * time.Second)
-	atomic.SwapInt32()
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		for tick := range ticker.C {
+			val := atomic.SwapInt32(&types.Counter, 0)
+			types.Log.Debugf("(%v) %d RPS", tick, val)
+		}
+	}()
 	err = http.ListenAndServe(os.Getenv("SERVER_HOST")+":"+os.Getenv("SERVER_PORT"), nil)
 	if err != nil {
-		log.Panicf("Failed to listen and serve, panicking")
+		log.Fatalf("Failed to listen and serve, panicking")
 	}
 }
