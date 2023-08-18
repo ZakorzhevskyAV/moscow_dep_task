@@ -41,7 +41,7 @@ func Analytics(w http.ResponseWriter, req *http.Request) {
 		}
 		types.Log.Infof("User data row created")
 	}()
-	_, err := w.Write([]byte("aaa"))
+	_, err := w.Write([]byte("Request acquired, response sent"))
 	if err != nil {
 		types.Log.Errorf("Failed to write a response to the user: %s", err)
 		return
